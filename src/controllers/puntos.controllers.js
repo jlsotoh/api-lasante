@@ -9,11 +9,11 @@ export const getPuntosTrivias = asyncHandler(async (req, res) => {
 
     // Validar datos de entrada
     const errors = [];
-    const rolError = validateRequired(rol, 'Rol');
+    const rolError = validateRequired(rol, 'rol');
     if (rolError) {
         errors.push({ field: 'rol', message: rolError });
     }
-    const userIdError = validateRequired(userId, 'UserId');
+    const userIdError = validateRequired(userId, 'userId');
     if (userIdError) {
         errors.push({ field: 'userId', message: userIdError });
     }
