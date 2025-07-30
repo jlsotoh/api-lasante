@@ -5,6 +5,7 @@ import puntosRoutes from "./routes/puntos.router.js";
 import reportesRoutes from './routes/reportes.routes.js'
 import { errorHandler } from "./middlewares/errorHandler.js";
 import { apiResponse } from "./utils/apiResponse.js";
+import chartsRoutes from "./routes/charts.router.js";
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use((req, res, next) => {
 app.use('/api/users', usersRoutes);
 app.use('/api/puntos', puntosRoutes);
 app.use('/api/reportes', reportesRoutes);
+app.use('/api/charts', chartsRoutes);
 
 // Ruta de prueba de API
 app.get('/api/health', (req, res) => {
