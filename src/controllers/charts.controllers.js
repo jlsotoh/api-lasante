@@ -5,6 +5,11 @@ import sql from "mssql";
 export const getCadenasAsesores = async (req, res) => {
     const { fechaInicio, fechaFin, userId } = req.body;
 
+    if (!fechaInicio || !fechaFin || !userId) {
+        return apiResponse.unauthorized(res, "Credenciales inválidas");
+    }
+
+
     try {
         const pool = await getConnection();
         const request = pool.request();
@@ -18,11 +23,6 @@ export const getCadenasAsesores = async (req, res) => {
             AND [Fecha Creaccion] between @fechaInicio AND @fechaFin
             GROUP BY cadena;`);
 
-
-        if (!result.recordset || result.recordset.length === 0) {
-            return apiResponse.unauthorized(res, "Credenciales inválidas");
-        }
-
         const cadenas = result.recordset;
 
         if (cadenas.length <= 0) {
@@ -32,8 +32,6 @@ export const getCadenasAsesores = async (req, res) => {
         const responseData = {
             cadenas: cadenas
         }
-
-
 
         return apiResponse.success(res, responseData, "Cadenas obtenidas correctamente", 200);
     } catch (error) {

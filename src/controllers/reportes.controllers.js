@@ -1,4 +1,4 @@
-import { getConnection } from "../database/connection.js";
+import { getConnection, encodeUtf8 } from "../database/connection.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../middlewares/errorHandler.js";
 import { validateRequired } from "../utils/validators.js";
@@ -7,26 +7,9 @@ import sql from "mssql";
 export const getReporteRegistrosAsesor = async (req, res) => {
     const { fechaInicio, fechaFin, userId } = req.body;
 
-    /*  // Validar datos de entrada
-     const errors = [];
-     const userIdError = validateRequired(userId, 'userId');
-     if (userIdError) {
-         errors.push({ field: 'userId', message: userIdError });
-     }
- 
-     if (errors.length > 0) {
-         return apiResponse.validationError(res, errors, "Datos de entrada inválidos");
-     }
- 
-     const fechaInicioError = validateRequired(fechaInicio, 'fechaInicio');
-     if (fechaInicioError) {
-         errors.push({ field: 'fechaInicio', message: fechaInicioError });
-     }
- 
-     const fechaFinError = validateRequired(fechaFin, 'fechaFin');
-     if (fechaFinError) {
-         errors.push({ field: 'fechaFin', message: fechaFinError });
-     } */
+    if (!fechaInicio || !fechaFin || !userId) {
+        return apiResponse.unauthorized(res, "Credenciales inválidas");
+    }
 
     try {
         const pool = await getConnection();
@@ -67,7 +50,19 @@ export const getReporteRegistrosAsesor = async (req, res) => {
             WHERE ase.Id_asesor LIKE (SELECT Id_asesor FROM tbl_Lasante_CAT_asesor WHERE Cedula = @userId) AND q.Completado = 1
             AND [Fecha Creaccion] between @fechaInicio AND @fechaFin
             ORDER BY 1`);
-        res.send(result.recordset);
+
+
+        const registros = encodeUtf8(result.recordset)
+        if (registros.length <= 0) {
+            return apiResponse.unauthorized(res, "No se encontraron cadenas");
+        }
+
+        const responseData = {
+            registros: registros
+        }
+
+        return apiResponse.success(res, responseData, "Cadenas obtenidas correctamente", 200);
+
     } catch (error) {
         console.error(error);
         return apiResponse.error(res, "Error al obtener el reporte de registros", 500);
@@ -77,6 +72,10 @@ export const getReporteRegistrosAsesor = async (req, res) => {
 export const getReporteRegistrosCadenasAsesor = async (req, res) => {
     const { fechaInicio, fechaFin, userId } = req.body;
 
+    if (!fechaInicio || !fechaFin || !userId) {
+        return apiResponse.unauthorized(res, "Credenciales inválidas");
+    }
+
     try {
         const pool = await getConnection();
         const request = pool.request();
@@ -85,11 +84,24 @@ export const getReporteRegistrosCadenasAsesor = async (req, res) => {
         request.input('fechaInicio', sql.VarChar, fechaInicio);
         request.input('fechaFin', sql.VarChar, fechaFin);
 
-        const result = await request.query(`SELECT CAST(cadena AS TEXT) AS cadena, COUNT(cadena) AS num
+        const result = await request.query(`SELECT CAST(cadena AS TEXT) AS cadena, COUNT(cadena) AS total
             FROM  tbl_Lasante_qrs
-            WHERE Responsable LIKE @userId AND [Fecha Creaccion] between @fechaInicio AND @fechaFin
+            WHERE Responsable = (select Id_asesor
+            FROM  tbl_Lasante_CAT_asesor  a
+            where a.Cedula = @userId) 
+            AND [Fecha Creaccion] between @fechaInicio AND @fechaFin
             GROUP BY cadena`);
-        res.send(result.recordset);
+
+        const cadenas = result.recordset;
+        if (cadenas.length <= 0) {
+            return apiResponse.unauthorized(res, "No se encontraron cadenas");
+        }
+
+        const responseData = {
+            cadenas: cadenas
+        }
+
+        return apiResponse.success(res, responseData, "Cadenas obtenidas correctamente", 200);
     } catch (error) {
         console.error(error);
         return apiResponse.error(res, "Error al obtener el reporte de registros", 500);
@@ -140,7 +152,18 @@ export const getReporteRegistrosAdministrador = async (req, res) => {
         ON q.Responsable = ase.Id_asesor
         WHERE q.Completado = 1 AND [Fecha Creaccion] between @fechaInicio AND @fechaFin
         ORDER BY 1`);
-        res.send(result.recordset);
+
+
+        const registros = result.recordset;
+        if (registros.length <= 0) {
+            return apiResponse.unauthorized(res, "No se encontraron registros");
+        }
+
+        const responseData = {
+            registros: registros
+        }
+
+        return apiResponse.success(res, responseData, "Registros obtenidos correctamente", 200);
     } catch (error) {
         console.error(error);
         return apiResponse.error(res, "Error al obtener el reporte de registros", 500);
@@ -149,6 +172,10 @@ export const getReporteRegistrosAdministrador = async (req, res) => {
 
 export const getReporteRegistrosAsesoresAdministrador = async (req, res) => {
     const { userId, fechaInicio, fechaFin } = req.body;
+    if (!fechaInicio || !fechaFin || !userId) {
+        return apiResponse.unauthorized(res, "Credenciales inválidas");
+    }
+
 
     try {
         const pool = await getConnection();
@@ -172,7 +199,17 @@ export const getReporteRegistrosAsesoresAdministrador = async (req, res) => {
         WHERE a.Activo = 1 AND qr.[Fecha Creaccion] BETWEEN @fechaInicio AND @fechaFin
         GROUP BY a.Id_asesor, a.Nombre, a.Distrito, qr.cadena
         ORDER BY  a.Distrito, a.Nombre, num DESC`);
-        res.send(result.recordset);
+
+        const registros = result.recordset;
+        if (registros.length <= 0) {
+            return apiResponse.unauthorized(res, "No se encontraron registros");
+        }
+
+        const responseData = {
+            registros: registros
+        }
+
+        return apiResponse.success(res, responseData, "Registros obtenidos correctamente", 200);
     } catch (error) {
         console.error(error);
         return apiResponse.error(res, "Error al obtener el reporte de registros", 500);
@@ -181,6 +218,10 @@ export const getReporteRegistrosAsesoresAdministrador = async (req, res) => {
 
 export const getReporteRegistrosCadenasAdministrador = async (req, res) => {
     const { userId, fechaInicio, fechaFin } = req.body;
+
+    if (!fechaInicio || !fechaFin || !userId) {
+        return apiResponse.unauthorized(res, "Credenciales inválidas");
+    }
 
     try {
         const pool = await getConnection();
@@ -204,7 +245,12 @@ export const getReporteRegistrosCadenasAdministrador = async (req, res) => {
             AND q.[Fecha Creaccion] BETWEEN @fechaInicio AND @fechaFin
             GROUP BY q.cadena`);
 
-        res.send({ result: result.recordset, result2: result2.recordset });
+        const responseData = {
+            cadenasDistrito: result.recordset,
+            cadenasTotal: result2.recordset
+        }
+
+        return apiResponse.success(res, responseData, "Registros obtenidos correctamente", 200);
     } catch (error) {
         console.error(error);
         return apiResponse.error(res, "Error al obtener el reporte de registros", 500);
@@ -213,6 +259,10 @@ export const getReporteRegistrosCadenasAdministrador = async (req, res) => {
 
 export const getReporteRegistrosGeneral = async (req, res) => {
     const { fechaInicio, fechaFin, distrito } = req.body;
+
+    if (!fechaInicio || !fechaFin || !distrito) {
+        return apiResponse.unauthorized(res, "Credenciales inválidas");
+    }
 
     try {
         const pool = await getConnection();
@@ -258,7 +308,17 @@ export const getReporteRegistrosGeneral = async (req, res) => {
         AND q.[Fecha Creaccion] BETWEEN @fechaInicio AND @fechaFin
         ORDER BY 1
         `);
-        res.send(result.recordset);
+
+        const registros = result.recordset;
+        if (registros.length <= 0) {
+            return apiResponse.unauthorized(res, "No se encontraron registros");
+        }
+
+        const responseData = {
+            registros: registros
+        }
+
+        return apiResponse.success(res, responseData, "Registros obtenidos correctamente", 200);
     } catch (error) {
         console.error(error);
         return apiResponse.error(res, "Error al obtener el reporte de registros", 500);
@@ -267,6 +327,10 @@ export const getReporteRegistrosGeneral = async (req, res) => {
 
 export const getReporteRegistrosAsesoresGeneral = async (req, res) => {
     const { fechaInicio, fechaFin, distrito } = req.body;
+
+    if (!fechaInicio || !fechaFin || !distrito) {
+        return apiResponse.unauthorized(res, "Credenciales inválidas");
+    }
 
     try {
         const pool = await getConnection();
@@ -303,7 +367,11 @@ export const getReporteRegistrosAsesoresGeneral = async (req, res) => {
             });
         }
 
-        res.send({ result: resultado });
+        const responseData = {
+            registros: resultado
+        }
+
+        return apiResponse.success(res, responseData, "Registros obtenidos correctamente", 200);
     } catch (error) {
         console.error(error);
         return apiResponse.error(res, "Error al obtener el reporte de registros", 500);
@@ -312,6 +380,10 @@ export const getReporteRegistrosAsesoresGeneral = async (req, res) => {
 
 export const getReporteRegistrosCadenasGeneral = async (req, res) => {
     const { fechaInicio, fechaFin, distrito } = req.body;
+
+    if (!fechaInicio || !fechaFin || !distrito) {
+        return apiResponse.unauthorized(res, "Credenciales inválidas");
+    }
 
     try {
         const pool = await getConnection();
@@ -328,7 +400,17 @@ export const getReporteRegistrosCadenasGeneral = async (req, res) => {
             WHERE a.Distrito LIKE @distrito
             AND [Fecha Creaccion] BETWEEN @fechaInicio AND @fechaFin
             GROUP BY q.cadena`);
-        res.send(result.recordset);
+
+        const registros = result.recordset;
+        if (registros.length <= 0) {
+            return apiResponse.error(res, "No se encontraron registros", 404);
+        }
+
+        const responseData = {
+            registros: result.recordset
+        }
+
+        return apiResponse.success(res, responseData, "Registros obtenidos correctamente", 200);
     } catch (error) {
         console.error(error);
         return apiResponse.error(res, "Error al obtener el reporte de registros", 500);
