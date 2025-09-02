@@ -30,8 +30,29 @@ export const uploadCsv = async (req, res) => {
         if (!Array.isArray(records) || records.length === 0) {
             return apiResponse.error(res, "El CSV no contiene registros", 400);
         }
-
         const pool = await getConnection();
+
+        // Asegurar que la tabla exista y limpiar datos
+        await pool.request().query(`
+            IF OBJECT_ID('dbo.tbl_lasante_vademecum', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.tbl_lasante_vademecum (
+                    imagen NVARCHAR(255) NULL,
+                    icono NVARCHAR(100) NULL,
+                    nombre NVARCHAR(200) NOT NULL,
+                    presentacion NVARCHAR(MAX) NULL,
+                    texto NVARCHAR(MAX) NULL,
+                    registro_sanitario NVARCHAR(MAX) NULL,
+                    idStatus INT NULL
+                );
+            END`);
+
+        try {
+            await pool.request().query(`TRUNCATE TABLE dbo.tbl_lasante_vademecum`);
+        } catch (_) {
+            await pool.request().query(`DELETE FROM dbo.tbl_lasante_vademecum`);
+        }
+
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
 
